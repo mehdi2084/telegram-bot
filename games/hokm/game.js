@@ -96,7 +96,6 @@ class Game extends EventEmitter {
 
     finishDeal() {
         this.deck.dealCards(this.players, 4);
-
         this.deck.dealCards(this.players, 4);
 
         this.players.forEach((player) => {
@@ -107,11 +106,14 @@ class Game extends EventEmitter {
 
         this.emit("roundStarted", {
             hokm: this.hokm,
-
             hakem: this.hakem,
-
             players: this.players,
         });
+
+        // اگر حکم توسط بات انتخاب شده، بازی را شروع کن
+        if (this.hakem.isBot) {
+            this.startTurn();
+        }
     }
     //--------------------------------
     // انتخاب حاکم
@@ -141,6 +143,9 @@ class Game extends EventEmitter {
         });
 
         this.finishDeal();
+
+        // شروع اولین نوبت بعد از انتخاب حکم
+        this.startTurn();
     }
     //--------------------------------
     // نوبت بازیکن
@@ -605,10 +610,6 @@ class Game extends EventEmitter {
 
     begin() {
         this.start();
-
-        if (this.started && this.currentPlayer) {
-            this.startTurn();
-        }
     }
     //--------------------------------
     // Event Registration
