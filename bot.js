@@ -1,396 +1,217 @@
 const TelegramBot = require("node-telegram-bot-api").default;
 
-const Player = require("./games/hokm/player");
-const Room = require("./games/hokm/room");
-const Game = require("./games/hokm/game");
-
 const token = process.env.BOT_TOKEN;
 
 const bot = new TelegramBot(token, {
     polling: true,
 });
 
-console.log("Chiko Bot Started 🚀");
+console.log("🚀 Chiko Bot Started");
 
+// ==========================
 // کاربران
-const users = {};
+// ==========================
 
-// اتاق‌های حکم
-const rooms = {};
+const users = {};
 
 // ثبت کاربر
 function registerUser(id, name) {
     if (!users[id]) {
         users[id] = {
+            id,
             name,
-
             xp: 0,
-
             coins: 0,
+            joinDate: new Date().toISOString(),
         };
     }
+
+    return users[id];
 }
 
 // ==========================
-// START
+// COMMANDS
 // ==========================
 
-bot.onText(/\/start/, (msg) => {
-    registerUser(msg.from.id, msg.from.first_name);
+const commands = {
+    start: require("./commands/start"),
+    profile: require("./commands/profile"),
+    top: require("./commands/top"),
 
-    bot.sendMessage(
-        msg.chat.id,
+    dice: require("./commands/dice"),
+    coin: require("./commands/coin"),
+    joke: require("./commands/joke"),
+    fact: require("./commands/fact"),
+    luck: require("./commands/luck"),
+    guess: require("./commands/guess"),
+    rps: require("./commands/rps"),
 
-        `سلام ${msg.from.first_name} 👋
-
-به چیکو خوش آمدی 🤖
-
-
-🎮 بازی‌ها:
-
-/hokm
-/join
-/startgame
-
-
-😂 سرگرمی:
-
-/dice
-/coin
-/joke
-
-
-👤 پروفایل:
-
-/profile
-/top`,
-    );
-});
+    hokm: require("./commands/hokm"),
+};
 
 // ==========================
-// PROFILE
+// LOAD COMMANDS
 // ==========================
 
-bot.onText(/\/profile/, (msg) => {
-    registerUser(msg.from.id, msg.from.first_name);
-
-    const user = users[msg.from.id];
-
-    bot.sendMessage(
-        msg.chat.id,
-
-        `👤 ${user.name}
-
-⭐ XP : ${user.xp}
-🪙 Coins : ${user.coins}`,
-    );
-});
-
-// ==========================
-// ساخت روم حکم
-// ==========================
-
-bot.onText(/\/hokm/, (msg) => {
-    const chatId = msg.chat.id;
-
-    if (rooms[chatId]) {
-        bot.sendMessage(chatId, "❌ یک بازی از قبل ساخته شده.");
-
-        return;
-    }
-
-    const room = new Room(chatId, msg.from.id);
-
-    rooms[chatId] = room;
-
-    const player = new Player(msg.from.id, msg.from.first_name);
-
-    room.addPlayer(player);
-
-    bot.sendMessage(
-        chatId,
-
-        `♠️ بازی حکم ساخته شد
-
-👤 ${player.name} وارد شد
-
-بازیکنان دیگر:
- /join`,
-    );
-});
-
-// ==========================
-// ورود بازیکن
-// ==========================
-
-bot.onText(/\/join/, (msg) => {
-    const room = rooms[msg.chat.id];
-
-    if (!room) {
-        bot.sendMessage(msg.chat.id, "❌ بازی وجود ندارد");
-
-        return;
-    }
-
-    const player = new Player(
-        msg.from.id,
-
-        msg.from.first_name,
-    );
-
-    const result = room.addPlayer(player);
-
-    if (!result) {
-        bot.sendMessage(msg.chat.id, "❌ امکان ورود نیست");
-
-        return;
-    }
-
-    bot.sendMessage(
-        msg.chat.id,
-
-        `✅ ${player.name} وارد بازی شد
-
-👥 تعداد بازیکنان:
-${room.playerCount()}/4`,
-    );
-});
-
-// ==========================
-// شروع بازی
-// ==========================
-
-bot.onText(/\/startgame/, (msg) => {
-    const room = rooms[msg.chat.id];
-
-    if (!room) {
-        bot.sendMessage(msg.chat.id, "❌ روم وجود ندارد");
-
-        return;
-    }
-
-    if (!room.isFull()) {
-        bot.sendMessage(
-            msg.chat.id,
-
-            "❌ هنوز 4 بازیکن کامل نشده",
-        );
-
-        return;
-    }
-
-    room.addBots(0);
-
-    const game = new Game(room);
-
-    room.game = game;
-
-    game.on("chooseHokm", (player) => {
-        bot.sendMessage(
-            msg.chat.id,
-
-            `👑 ${player.name}
-
-حکم خود را انتخاب کن:
-
-♠️ ♣️ ♥️ ♦️`,
-        );
-    });
-
-    game.on(
-        "roundStarted",
-
-        (data) => {
-            bot.sendMessage(
-                msg.chat.id,
-
-                `🎮 بازی شروع شد
-
-👑 حاکم:
-${data.hakem.name}
-
-🃏 حکم:
-${data.hokm}`,
-            );
-
-            game.startTurn();
-        },
-    );
-
-    game.on(
-        "playerTurn",
-
-        (data) => {
-            if (data.player.isBot) return;
-
-            bot.sendMessage(
-                msg.chat.id,
-
-                `🎯 نوبت ${data.player.name}
-
-کارت خود را ارسال کن:
-
-مثال:
-
-/play A ♠`,
-            );
-        },
-    );
-
-    game.on(
-        "cardPlayed",
-
-        (data) => {
-            bot.sendMessage(
-                msg.chat.id,
-
-                `${data.player.name}
-کارت ${data.card.value}${data.card.suit} بازی کرد`,
-            );
-        },
-    );
-
-    game.on(
-        "trickFinished",
-
-        (data) => {
-            bot.sendMessage(
-                msg.chat.id,
-
-                `🏆 این دست را ${data.winner.name} برد`,
-            );
-        },
-    );
-
-    game.on(
-        "matchFinished",
-
-        (data) => {
-            bot.sendMessage(
-                msg.chat.id,
-
-                `🎉 بازی تمام شد
-
-برنده تیم ${data.winner}
-
-امتیاز:
-
-${JSON.stringify(data.score)}`,
-            );
-        },
-    );
-
-    game.begin();
-});
-
-// ==========================
-// انتخاب حکم
-// ==========================
-
-bot.onText(
-    /\/hokmchoose (♠|♥|♦|♣)/,
-
-    (msg, match) => {
-        const room = rooms[msg.chat.id];
-
-        if (!room || !room.game) return;
-
-        room.game.setHokm(match[1]);
-    },
+commands.start(
+    bot,
+    users,
+    registerUser
+);
+
+commands.profile(
+    bot,
+    users,
+    registerUser
+);
+
+commands.top(
+    bot,
+    users
+);
+
+commands.dice(
+    bot,
+    users
+);
+
+commands.coin(
+    bot,
+    users
+);
+
+commands.joke(
+    bot
+);
+
+commands.fact(
+    bot
+);
+
+commands.luck(
+    bot
+);
+
+commands.guess(
+    bot,
+    users,
+    registerUser
+);
+
+commands.rps(
+    bot,
+    users,
+    registerUser
+);
+
+commands.hokm(
+    bot,
+    users,
+    registerUser
 );
 
 // ==========================
-// لغو بازی حکم
+// UNKNOWN COMMAND
 // ==========================
 
-bot.onText(/\/cancel/, (msg) => {
-    const room = rooms[msg.chat.id];
+const knownCommands = new Set([
+    "start",
+    "profile",
+    "top",
 
-    if (!room) {
-        bot.sendMessage(msg.chat.id, "❌ بازی فعالی وجود ندارد.");
+    "dice",
+    "coin",
+    "joke",
+    "fact",
+    "luck",
+    "guess",
+    "rps",
 
-        return;
-    }
+    "hokm",
+    "join",
+    "startgame",
+    "cancel",
+    "play",
+    "hokmchoose",
+]);
 
-    // فقط سازنده روم می‌تواند لغو کند
-    if (room.ownerId !== msg.from.id) {
+bot.onText(/^\/([^\s]+)/, (msg, match) => {
+
+    const command = match[1];
+
+    if (!knownCommands.has(command)) {
+
         bot.sendMessage(
             msg.chat.id,
-            "❌ فقط سازنده بازی می‌تواند آن را لغو کند.",
+            "❌ دستور ناشناخته.\n\nبرای مشاهده دستورات از /start استفاده کنید."
         );
 
-        return;
     }
 
-    if (room.game) {
-        room.game.stop("Cancelled");
-    }
-
-    delete rooms[msg.chat.id];
-
-    bot.sendMessage(msg.chat.id, "🛑 بازی حکم لغو شد.");
 });
 
 // ==========================
-// بازی کارت
+// POLLING ERROR
 // ==========================
 
-bot.onText(
-    /\/play (.+) (♠|♥|♦|♣)/,
+bot.on(
+    "polling_error",
+    (err) => {
 
-    (msg, match) => {
-        const room = rooms[msg.chat.id];
+        console.error(
+            "Polling Error:",
+            err.message
+        );
 
-        if (!room || !room.game) return;
-
-        const playerId = msg.from.id;
-
-        const value = match[1];
-
-        const suit = match[2];
-
-        const result = room.game.play(playerId, suit, value);
-
-        if (!result) {
-            bot.sendMessage(msg.chat.id, "❌ حرکت غیرمجاز");
-        }
-    },
+    }
 );
 
 // ==========================
-// تاس
+// GENERAL ERROR
 // ==========================
 
-bot.onText(/\/dice/, (msg) => {
-    const n = Math.floor(Math.random() * 6) + 1;
+bot.on(
+    "error",
+    (err) => {
 
-    bot.sendMessage(
-        msg.chat.id,
+        console.error(
+            "Bot Error:",
+            err
+        );
 
-        `🎲 ${n}`,
-    );
-});
-
-// ==========================
-// سکه
-// ==========================
-
-bot.onText(/\/coin/, (msg) => {
-    bot.sendMessage(
-        msg.chat.id,
-
-        Math.random() < 0.5 ? "🦁 شیر" : "🪙 خط",
-    );
-});
+    }
+);
 
 // ==========================
-// جوک
+// UNHANDLED PROMISE
 // ==========================
 
-bot.onText(/\/joke/, (msg) => {
-    bot.sendMessage(
-        msg.chat.id,
+process.on(
+    "unhandledRejection",
+    (err) => {
 
-        "😂 برنامه نویس خواب نمیبینه، دیباگ میکنه!",
-    );
-});
+        console.error(
+            "Unhandled Rejection:",
+            err
+        );
+
+    }
+);
+
+// ==========================
+// UNCAUGHT EXCEPTION
+// ==========================
+
+process.on(
+    "uncaughtException",
+    (err) => {
+
+        console.error(
+            "Uncaught Exception:",
+            err
+        );
+
+    }
+);
+
+console.log("✅ All commands loaded successfully.");
