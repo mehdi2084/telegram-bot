@@ -68,9 +68,14 @@ class HokmManager {
 
         if (!room) return null;
 
-        if (!room.isFull()) return false;
-
         if (room.game) return room.game;
+
+        // اضافه کردن بات‌ها تا تکمیل شدن ۴ بازیکن
+        const needBots = 4 - room.playerCount();
+
+        if (needBots > 0) {
+            room.addBots(needBots);
+        }
 
         room.startGame();
 
