@@ -1,10 +1,16 @@
 const BotPlayer = require("./botPlayer");
 
 class Room {
-    constructor(chatId, ownerId) {
+    /**
+     * @param {number} chatId - در حالت گروهی: آیدی گروه. در حالت PV تکی: آیدی خودِ کاربر.
+     * @param {number} ownerId
+     * @param {"group"|"solo"} mode
+     */
+    constructor(chatId, ownerId, mode = "group") {
         this.id = chatId;
         this.chatId = chatId;
         this.ownerId = ownerId;
+        this.mode = mode;
 
         this.players = [];
 
@@ -16,9 +22,7 @@ class Room {
     // اضافه کردن بازیکن واقعی
     addPlayer(player) {
         if (this.started) return false;
-
         if (this.players.length >= 4) return false;
-
         if (this.players.find((p) => p.id === player.id)) return false;
 
         this.players.push(player);
@@ -26,10 +30,10 @@ class Room {
         return true;
     }
 
-    // اضافه کردن بات
+    // پر کردن جای خالی با بات — آیدی بات‌ها به روم متصل است تا بین روم‌های مختلف تداخل نکند
     addBots(count) {
         for (let i = 1; i <= count; i++) {
-            this.players.push(new BotPlayer("bot_" + i, `🤖 Bot ${i}`));
+            this.players.push(new BotPlayer(`bot_${this.id}_${i}`, `🤖 ربات ${i}`));
         }
     }
 
@@ -38,27 +42,27 @@ class Room {
         this.players = this.players.filter((p) => p.id !== id);
     }
 
-    // پیدا کردن بازیکن
     getPlayer(id) {
         return this.players.find((p) => p.id === id);
     }
 
-    // همه بازیکنان
     getPlayers() {
         return this.players;
     }
 
-    // تعداد بازیکنان
+    getHumanPlayers() {
+        return this.players.filter((p) => !p.isBot);
+    }
+
     playerCount() {
         return this.players.length;
     }
 
-    // آیا اتاق کامل است؟
     isFull() {
         return this.players.length === 4;
     }
 
-    // تشکیل تیم‌ها
+    // تشکیل تیم‌ها — نفرات روبه‌رو (۰و۲ / ۱و۳) هم‌تیمی‌اند
     createTeams() {
         if (this.players.length !== 4) return false;
 
@@ -71,21 +75,19 @@ class Room {
         return true;
     }
 
-    // تعیین حاکم
+    // تعیین حاکمِ راند اول
     setHakem(index = 0) {
         this.players.forEach((p) => (p.isHakem = false));
-
         this.players[index].isHakem = true;
 
         return this.players[index];
     }
 
-    // حاکم فعلی
     getHakem() {
         return this.players.find((p) => p.isHakem);
     }
 
-    // شروع بازی
+    // شروع رسمی بازی (بعد از تکمیل ۴ نفر)
     startGame() {
         if (!this.isFull()) return false;
 
@@ -93,21 +95,27 @@ class Room {
 
         this.createTeams();
 
-        this.setHakem();
-
         return true;
     }
 
-    // پایان بازی
+    // پایان کامل بازی/روم
     endGame() {
         this.started = false;
-
-        this.players.forEach((p) => {
-            p.reset();
-        });
+        this.players.forEach((p) => p.reset());
     }
 
-    // خلاصه اتاق
+    // متن خلاصه‌ی لابی برای پیام گروه (قبل از شروع بازی)
+    getLobbyText() {
+        let text = `👥 بازیکنان (${this.playerCount()}/4):\n\n`;
+
+        this.players.forEach((player, index) => {
+            text += `${index + 1}. ${player.name}${player.id === this.ownerId ? " 👑" : ""}\n`;
+        });
+
+        return text;
+    }
+
+    // متن خلاصه‌ی وضعیت تیم‌ها/حاکم (بعد از شروع بازی)
     getInfo() {
         let text = "";
 
@@ -115,10 +123,8 @@ class Room {
             text += `${index + 1}. ${player.name}`;
 
             if (player.isBot) text += " 🤖";
-
             if (player.isHakem) text += " 👑";
-
-            if (player.team) text += ` | Team ${player.team}`;
+            if (player.team) text += ` | تیم ${player.team}`;
 
             text += "\n";
         });

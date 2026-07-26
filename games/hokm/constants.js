@@ -16,12 +16,10 @@ const KNOWN_COMMANDS = [
     "guess",
     "rps",
 
-    "hokm",
-    "join",
-    "startgame",
-    "hokmchoose",
-    "play",
+    "hokm", // در گروه: لابی با دکمه | در PV: بازیِ تکی فوری با ۳ ربات
     "cancel",
+    // نکته: /join و /startgame و /hokmchoose و /play دیگر لازم نیستند —
+    // در نسخه‌ی جدیدِ حکم همه‌چیز با دکمه‌های شیشه‌ای (inline keyboard) انجام می‌شود.
 ];
 
 // پیام‌های عمومی تکرارشونده
