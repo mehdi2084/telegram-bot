@@ -142,8 +142,9 @@ function registerEvents(bot, chatId, game) {
         );
     });
 
-    game.on("roundStarted", (data) => {
-        bot.sendMessage(
+    game.on("roundStarted", async (data) => {
+        // پیام شروع بازی در گروه
+        await bot.sendMessage(
             chatId,
             `🎮 بازی شروع شد
 
@@ -151,6 +152,35 @@ function registerEvents(bot, chatId, game) {
 
 🃏 حکم: ${data.hokm}`,
         );
+
+        // ارسال دست هر بازیکن در PV
+        for (const player of data.players) {
+            // برای بات‌ها پیام ارسال نکن
+            if (player.isBot) continue;
+
+            // ساخت متن کارت‌ها
+            const cards = player.hand
+                .map((card) => `${card.value}${card.suit}`)
+                .join("   ");
+
+            try {
+                await bot.sendMessage(
+                    player.id,
+                    `🃏 دست شما
+
+${cards}
+
+برای بازی کردن از دستور زیر استفاده کنید:
+
+/play A ♠`,
+                );
+            } catch (err) {
+                await bot.sendMessage(
+                    chatId,
+                    `⚠️ ${player.name} ابتدا باید ربات را در گفتگوی خصوصی (/start) اجرا کند تا بتوانم دستش را برایش ارسال کنم.`,
+                );
+            }
+        }
     });
 
     game.on("playerTurn", (data) => {
