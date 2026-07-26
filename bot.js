@@ -115,10 +115,6 @@ const knownCommands = new Set([
     "rps",
 
     "hokm",
-    "join",
-    "startgame",
-    "hokmchoose",
-    "play",
     "cancel",
 ]);
 
