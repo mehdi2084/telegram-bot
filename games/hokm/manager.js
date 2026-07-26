@@ -1,532 +1,157 @@
 const Room = require("./room");
-const Game = require("./game");
 const Player = require("./player");
-
+const Game = require("./game");
 
 class HokmManager {
-
-
-    constructor(){
-
+    constructor() {
         this.rooms = new Map();
-
     }
 
+    // -------------------------
+    // ساخت روم
+    // -------------------------
 
+    createRoom(chatId, user) {
+        if (this.rooms.has(chatId)) return null;
 
-    //--------------------------------
-    // ساخت اتاق
-    //--------------------------------
+        const room = new Room(chatId, user.id);
 
-    createRoom(user){
+        room.addPlayer(new Player(user.id, user.first_name));
 
-
-        const chatId = user.id;
-
-
-        const room = new Room(
-            chatId,
-            user.id
-        );
-
-
-
-        const player = new Player(
-            user.id,
-            user.username || user.first_name
-        );
-
-
-
-        room.addPlayer(player);
-
-
-
-        this.rooms.set(
-            chatId.toString(),
-            room
-        );
-
-
+        this.rooms.set(chatId, room);
 
         return room;
-
     }
 
-
-
-
-    //--------------------------------
-    // گرفتن اتاق
-    //--------------------------------
-
-    getRoom(roomId){
-
-
-        return this.rooms.get(
-            roomId.toString()
-        );
-
-
-    }
-
-
-
-
-
-    //--------------------------------
+    // -------------------------
     // ورود بازیکن
-    //--------------------------------
+    // -------------------------
 
-    joinRoom(roomId,user){
+    joinRoom(chatId, user) {
+        const room = this.rooms.get(chatId);
 
+        if (!room) return null;
 
-        const room = this.getRoom(roomId);
+        const player = new Player(user.id, user.first_name);
 
+        if (!room.addPlayer(player)) return false;
 
-
-        if(!room){
-
-            return {
-                success:false,
-                message:"اتاق پیدا نشد"
-            };
-
-        }
-
-
-
-        const player = new Player(
-            user.id,
-            user.username || user.first_name
-        );
-
-
-
-        const added = room.addPlayer(player);
-
-
-
-        if(!added){
-
-            return {
-                success:false,
-                message:"امکان ورود نیست"
-            };
-
-        }
-
-
-
-        return {
-
-            success:true,
-
-            room,
-
-            player
-
-        };
-
-
+        return room;
     }
 
+    // -------------------------
+    // گرفتن روم
+    // -------------------------
 
-
-
-
-    //--------------------------------
-    // اضافه کردن بات
-    //--------------------------------
-
-    addBots(roomId,count){
-
-
-        const room=this.getRoom(roomId);
-
-
-        if(!room)
-            return false;
-
-
-
-        room.addBots(count);
-
-
-        return true;
-
+    getRoom(chatId) {
+        return this.rooms.get(chatId) || null;
     }
 
+    // -------------------------
+    // گرفتن Game
+    // -------------------------
 
+    getGame(chatId) {
+        const room = this.getRoom(chatId);
 
-
-
-    //--------------------------------
-    // شروع بازی
-    //--------------------------------
-
-    startGame(roomId){
-
-
-        const room=this.getRoom(roomId);
-
-
-
-        if(!room)
-            return null;
-
-
-
-        if(room.players.length !== 4)
-            return null;
-
-
-
-        if(room.game)
-            return room.game;
-
-
-
-
-        room.createTeams();
-
-
-
-        const game = new Game(room);
-
-
-
-        room.game = game;
-
-
-
-        this.bindEvents(game,room);
-
-
-
-        game.begin();
-
-
-
-        return game;
-
-
-    }
-
-
-
-
-
-    //--------------------------------
-    // اتصال Event های Game
-    //--------------------------------
-
-    bindEvents(game,room){
-
-
-
-        game.on(
-            "chooseHokm",
-            (player)=>{
-
-
-                console.log(
-                    "انتخاب حکم توسط:",
-                    player.name
-                );
-
-
-            }
-        );
-
-
-
-
-        game.on(
-            "roundStarted",
-            (data)=>{
-
-
-                console.log(
-                    "شروع راند",
-                    data.hokm
-                );
-
-
-            }
-        );
-
-
-
-
-        game.on(
-            "playerTurn",
-            (data)=>{
-
-
-                console.log(
-                    "نوبت:",
-                    data.player.name
-                );
-
-
-            }
-        );
-
-
-
-
-
-        game.on(
-            "cardPlayed",
-            (data)=>{
-
-
-                console.log(
-                    data.player.name,
-                    data.card
-                );
-
-
-            }
-        );
-
-
-
-
-
-        game.on(
-            "trickFinished",
-            (data)=>{
-
-
-                console.log(
-                    "برنده دست:",
-                    data.winner.name
-                );
-
-
-            }
-        );
-
-
-
-
-
-        game.on(
-            "roundFinished",
-            (data)=>{
-
-
-                console.log(
-                    "پایان راند",
-                    data.score
-                );
-
-
-            }
-        );
-
-
-
-
-
-        game.on(
-            "matchFinished",
-            (data)=>{
-
-
-                console.log(
-                    "پایان مسابقه",
-                    data.score
-                );
-
-
-
-                room.started=false;
-
-
-            }
-        );
-
-
-
-
-
-    }
-
-
-
-
-
-    //--------------------------------
-    // بازی کارت
-    //--------------------------------
-
-    playCard(
-        roomId,
-        playerId,
-        suit,
-        value
-    ){
-
-
-        const room=this.getRoom(roomId);
-
-
-
-        if(!room || !room.game)
-            return false;
-
-
-
-        return room.game.play(
-            playerId,
-            suit,
-            value
-        );
-
-
-    }
-
-
-
-
-
-    //--------------------------------
-    // گرفتن بازی
-    //--------------------------------
-
-    getGame(roomId){
-
-
-        const room=this.getRoom(roomId);
-
-
-
-        if(!room)
-            return null;
-
-
+        if (!room) return null;
 
         return room.game;
-
-
     }
 
+    // -------------------------
+    // شروع بازی
+    // -------------------------
 
+    startGame(chatId) {
+        const room = this.getRoom(chatId);
 
+        if (!room) return null;
 
+        if (!room.isFull()) return false;
 
-    //--------------------------------
-    // حذف بازیکن
-    //--------------------------------
+        if (room.game) return room.game;
 
-    leaveRoom(roomId,playerId){
+        room.startGame();
 
+        room.game = new Game(room);
 
-        const room=this.getRoom(roomId);
+        return room.game;
+    }
 
+    // -------------------------
+    // انتخاب حکم
+    // -------------------------
 
+    chooseHokm(chatId, hokm) {
+        const game = this.getGame(chatId);
 
-        if(!room)
-            return false;
+        if (!game) return false;
 
+        game.setHokm(hokm);
 
+        return true;
+    }
+
+    // -------------------------
+    // بازی کارت
+    // -------------------------
+
+    play(chatId, playerId, suit, value) {
+        const game = this.getGame(chatId);
+
+        if (!game) return false;
+
+        return game.play(playerId, suit, value);
+    }
+
+    // -------------------------
+    // لغو بازی
+    // -------------------------
+
+    cancel(chatId) {
+        const room = this.getRoom(chatId);
+
+        if (!room) return false;
+
+        if (room.game) room.game.stop();
+
+        this.rooms.delete(chatId);
+
+        return true;
+    }
+
+    // -------------------------
+    // خروج بازیکن
+    // -------------------------
+
+    leave(chatId, playerId) {
+        const room = this.getRoom(chatId);
+
+        if (!room) return false;
 
         room.removePlayer(playerId);
 
-
-
-        if(room.players.length===0){
-
-            this.deleteRoom(roomId);
-
-        }
-
-
+        if (room.playerCount() === 0) this.rooms.delete(chatId);
 
         return true;
-
-
     }
 
+    // -------------------------
+    // تعداد روم‌ها
+    // -------------------------
 
-
-
-
-    //--------------------------------
-    // حذف اتاق
-    //--------------------------------
-
-    deleteRoom(roomId){
-
-
-        const room=this.getRoom(roomId);
-
-
-
-        if(!room)
-            return false;
-
-
-
-        if(room.game){
-
-            room.game.destroy();
-
-        }
-
-
-
-        this.rooms.delete(
-            roomId.toString()
-        );
-
-
-
-        return true;
-
-
-    }
-
-
-
-
-
-    //--------------------------------
-    // تعداد اتاق
-    //--------------------------------
-
-    count(){
-
-
+    count() {
         return this.rooms.size;
-
-
     }
 
+    // -------------------------
+    // لیست روم‌ها
+    // -------------------------
 
-
-
-
-    //--------------------------------
-    // لیست اتاق‌ها
-    //--------------------------------
-
-    getAllRooms(){
-
-
-        return [
-            ...this.rooms.values()
-        ];
-
-
+    allRooms() {
+        return [...this.rooms.values()];
     }
-
-
 }
-
-
 
 module.exports = new HokmManager();

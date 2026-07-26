@@ -1,3 +1,5 @@
+require("dotenv").config();
+
 const TelegramBot = require("node-telegram-bot-api").default;
 
 const token = process.env.BOT_TOKEN;
@@ -14,9 +16,10 @@ console.log("🚀 Chiko Bot Started");
 
 const users = {};
 
-// ثبت کاربر
 function registerUser(id, name) {
+
     if (!users[id]) {
+
         users[id] = {
             id,
             name,
@@ -24,94 +27,78 @@ function registerUser(id, name) {
             coins: 0,
             joinDate: new Date().toISOString(),
         };
+
     }
 
     return users[id];
+
 }
 
 // ==========================
-// COMMANDS
+// بارگذاری دستورات
 // ==========================
 
-const commands = {
-    start: require("./commands/start"),
-    profile: require("./commands/profile"),
-    top: require("./commands/top"),
-
-    dice: require("./commands/dice"),
-    coin: require("./commands/coin"),
-    joke: require("./commands/joke"),
-    fact: require("./commands/fact"),
-    luck: require("./commands/luck"),
-    guess: require("./commands/guess"),
-    rps: require("./commands/rps"),
-
-    hokm: require("./commands/hokm"),
-};
-
-// ==========================
-// LOAD COMMANDS
-// ==========================
-
-commands.start(
+require("./commands/start")(
     bot,
     users,
     registerUser
 );
 
-commands.profile(
+require("./commands/profile")(
     bot,
     users,
     registerUser
 );
 
-commands.top(
+require("./commands/top")(
     bot,
     users
 );
 
-commands.dice(
+require("./commands/dice")(
     bot,
     users
 );
 
-commands.coin(
+require("./commands/coin")(
     bot,
     users
 );
 
-commands.joke(
+require("./commands/joke")(
     bot
 );
 
-commands.fact(
+require("./commands/fact")(
     bot
 );
 
-commands.luck(
+require("./commands/luck")(
     bot
 );
 
-commands.guess(
+require("./commands/guess")(
     bot,
     users,
     registerUser
 );
 
-commands.rps(
-    bot,
-    users,
-    registerUser
-);
-
-commands.hokm(
+require("./commands/rps")(
     bot,
     users,
     registerUser
 );
 
 // ==========================
-// UNKNOWN COMMAND
+// Hokm
+// ==========================
+
+require("./commands/hokm")(
+    bot
+);
+
+// ==========================
+// دستور ناشناخته
 // ==========================
 
 const knownCommands = new Set([
@@ -130,9 +117,9 @@ const knownCommands = new Set([
     "hokm",
     "join",
     "startgame",
-    "cancel",
-    "play",
     "hokmchoose",
+    "play",
+    "cancel",
 ]);
 
 bot.onText(/^\/([^\s]+)/, (msg, match) => {
@@ -151,67 +138,43 @@ bot.onText(/^\/([^\s]+)/, (msg, match) => {
 });
 
 // ==========================
-// POLLING ERROR
+// خطاها
 // ==========================
 
-bot.on(
-    "polling_error",
-    (err) => {
+bot.on("polling_error", (err) => {
 
-        console.error(
-            "Polling Error:",
-            err.message
-        );
+    console.error(
+        "Polling Error:",
+        err.message
+    );
 
-    }
-);
+});
 
-// ==========================
-// GENERAL ERROR
-// ==========================
+bot.on("error", (err) => {
 
-bot.on(
-    "error",
-    (err) => {
+    console.error(
+        "Bot Error:",
+        err
+    );
 
-        console.error(
-            "Bot Error:",
-            err
-        );
+});
 
-    }
-);
+process.on("unhandledRejection", (err) => {
 
-// ==========================
-// UNHANDLED PROMISE
-// ==========================
+    console.error(
+        "Unhandled Rejection:",
+        err
+    );
 
-process.on(
-    "unhandledRejection",
-    (err) => {
+});
 
-        console.error(
-            "Unhandled Rejection:",
-            err
-        );
+process.on("uncaughtException", (err) => {
 
-    }
-);
+    console.error(
+        "Uncaught Exception:",
+        err
+    );
 
-// ==========================
-// UNCAUGHT EXCEPTION
-// ==========================
-
-process.on(
-    "uncaughtException",
-    (err) => {
-
-        console.error(
-            "Uncaught Exception:",
-            err
-        );
-
-    }
-);
+});
 
 console.log("✅ All commands loaded successfully.");

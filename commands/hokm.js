@@ -1,149 +1,206 @@
-module.exports = (bot, users, rooms, registerUser, Player, Room, Game) => {
-    // ساخت روم حکم
-    bot.onText(/\/hokm/, (msg) => {
-        const chatId = msg.chat.id;
+const manager = require("../games/hokm/manager");
 
-        if (rooms[chatId]) {
-            bot.sendMessage(chatId, "❌ یک بازی از قبل ساخته شده.");
-            return;
-        }
+module.exports = (bot) => {
+    // =========================
+    // ساخت روم
+    // =========================
 
-        const room = new Room(chatId, msg.from.id);
-        rooms[chatId] = room;
-        const player = new Player(msg.from.id, msg.from.first_name);
-        room.addPlayer(player);
+    bot.onText(/^\/hokm$/, (msg) => {
+        const room = manager.createRoom(msg.chat.id, msg.from);
 
-        bot.sendMessage(
-            chatId,
-            `♠️ بازی حکم ساخته شد\n\n👤 ${player.name} وارد شد\n\nبازیکنان دیگر:\n/join`
-        );
-    });
-
-    // ورود به بازی
-    bot.onText(/\/join/, (msg) => {
-        const room = rooms[msg.chat.id];
         if (!room) {
-            bot.sendMessage(msg.chat.id, "❌ بازی وجود ندارد");
-            return;
-        }
-
-        const player = new Player(msg.from.id, msg.from.first_name);
-        const result = room.addPlayer(player);
-
-        if (!result) {
-            bot.sendMessage(msg.chat.id, "❌ امکان ورود نیست");
+            bot.sendMessage(msg.chat.id, "❌ یک بازی در حال اجراست.");
             return;
         }
 
         bot.sendMessage(
             msg.chat.id,
-            `✅ ${player.name} وارد بازی شد\n\n👥 تعداد بازیکنان: ${room.playerCount()}/4`
+            `♠️ روم ساخته شد
+
+👤 ${msg.from.first_name} وارد بازی شد.
+
+برای ورود:
+/join`,
         );
     });
 
+    // =========================
+    // ورود
+    // =========================
+
+    bot.onText(/^\/join$/, (msg) => {
+        const room = manager.joinRoom(msg.chat.id, msg.from);
+
+        if (room === null) {
+            bot.sendMessage(msg.chat.id, "❌ رومی وجود ندارد.");
+
+            return;
+        }
+
+        if (room === false) {
+            bot.sendMessage(msg.chat.id, "❌ امکان ورود وجود ندارد.");
+
+            return;
+        }
+
+        bot.sendMessage(
+            msg.chat.id,
+            `✅ ${msg.from.first_name} وارد بازی شد.
+
+👥 ${room.playerCount()}/4`,
+        );
+    });
+
+    // =========================
     // شروع بازی
-    bot.onText(/\/startgame/, (msg) => {
-        const room = rooms[msg.chat.id];
-        if (!room) {
-            bot.sendMessage(msg.chat.id, "❌ روم وجود ندارد");
+    // =========================
+
+    bot.onText(/^\/startgame$/, (msg) => {
+        const game = manager.startGame(msg.chat.id);
+
+        if (game === null) {
+            bot.sendMessage(msg.chat.id, "❌ روم وجود ندارد.");
+
             return;
         }
 
-        if (!room.isFull()) {
-            bot.sendMessage(msg.chat.id, "❌ هنوز 4 بازیکن کامل نشده");
+        if (game === false) {
+            bot.sendMessage(msg.chat.id, "❌ هنوز چهار بازیکن کامل نشده‌اند.");
+
             return;
         }
 
-        room.addBots(0);
-        const game = new Game(room);
-        room.game = game;
-
-        // Event handlers
-        game.on("chooseHokm", (player) => {
-            bot.sendMessage(
-                msg.chat.id,
-                `👑 ${player.name}\n\nحکم خود را انتخاب کن:\n\n/hokmchoose ♠\n/hokmchoose ♥\n/hokmchoose ♦\n/hokmchoose ♣`
-            );
-        });
-
-        game.on("roundStarted", (data) => {
-            bot.sendMessage(
-                msg.chat.id,
-                `🎮 بازی شروع شد\n\n👑 حاکم: ${data.hakem.name}\n🃏 حکم: ${data.hokm}`
-            );
-            game.startTurn();
-        });
-
-        game.on("playerTurn", (data) => {
-            if (data.player.isBot) return;
-            bot.sendMessage(
-                msg.chat.id,
-                `🎯 نوبت ${data.player.name}\n\nکارت خود را ارسال کن:\nمثال: /play A ♠`
-            );
-        });
-
-        game.on("cardPlayed", (data) => {
-            bot.sendMessage(
-                msg.chat.id,
-                `${data.player.name} کارت ${data.card.value}${data.card.suit} بازی کرد`
-            );
-        });
-
-        game.on("trickFinished", (data) => {
-            bot.sendMessage(
-                msg.chat.id,
-                `🏆 این دست را ${data.winner.name} برد`
-            );
-        });
-
-        game.on("matchFinished", (data) => {
-            bot.sendMessage(
-                msg.chat.id,
-                `🎉 بازی تمام شد\n\nبرنده تیم ${data.winner}\n\nامتیاز:\n${JSON.stringify(data.score, null, 2)}`
-            );
-        });
+        registerEvents(bot, msg.chat.id, game);
 
         game.begin();
     });
 
+    // =========================
     // انتخاب حکم
-    bot.onText(/\/hokmchoose (♠|♥|♦|♣)/, (msg, match) => {
-        const room = rooms[msg.chat.id];
-        if (!room || !room.game) return;
-        room.game.setHokm(match[1]);
+    // =========================
+
+    bot.onText(/^\/hokmchoose (♠|♥|♦|♣)$/, (msg, match) => {
+        manager.chooseHokm(msg.chat.id, match[1]);
     });
 
+    // =========================
     // بازی کارت
-    bot.onText(/\/play (.+) (♠|♥|♦|♣)/, (msg, match) => {
-        const room = rooms[msg.chat.id];
-        if (!room || !room.game) return;
-        const playerId = msg.from.id;
-        const value = match[1];
-        const suit = match[2];
-        const result = room.game.play(playerId, suit, value);
-        if (!result) {
-            bot.sendMessage(msg.chat.id, "❌ حرکت غیرمجاز");
+    // =========================
+
+    bot.onText(/^\/play (.+) (♠|♥|♦|♣)$/, (msg, match) => {
+        const ok = manager.play(msg.chat.id, msg.from.id, match[2], match[1]);
+
+        if (!ok) {
+            bot.sendMessage(msg.chat.id, "❌ حرکت نامعتبر.");
         }
     });
 
-    // لغو بازی
-    bot.onText(/\/cancel/, (msg) => {
-        const room = rooms[msg.chat.id];
+    // =========================
+    // لغو
+    // =========================
+
+    bot.onText(/^\/cancel$/, (msg) => {
+        const room = manager.getRoom(msg.chat.id);
+
         if (!room) {
             bot.sendMessage(msg.chat.id, "❌ بازی فعالی وجود ندارد.");
+
             return;
         }
 
         if (room.ownerId !== msg.from.id) {
-            bot.sendMessage(msg.chat.id, "❌ فقط سازنده بازی می‌تواند آن را لغو کند.");
+            bot.sendMessage(
+                msg.chat.id,
+                "❌ فقط سازنده بازی می‌تواند بازی را لغو کند.",
+            );
+
             return;
         }
 
-        if (room.game) {
-            room.game.stop("Cancelled");
-        }
+        manager.cancel(msg.chat.id);
 
-        delete rooms[msg.chat.id];
-        bot.sendMessage(msg.chat.id, "🛑 بازی حکم لغو شد.");
+        bot.sendMessage(msg.chat.id, "🛑 بازی لغو شد.");
     });
 };
+
+// ===================================
+// Eventها
+// ===================================
+
+function registerEvents(bot, chatId, game) {
+    game.on("chooseHokm", (player) => {
+        bot.sendMessage(
+            chatId,
+            `👑 ${player.name}
+
+حکم را انتخاب کن.
+
+/hokmchoose ♠
+/hokmchoose ♥
+/hokmchoose ♦
+/hokmchoose ♣`,
+        );
+    });
+
+    game.on("roundStarted", (data) => {
+        bot.sendMessage(
+            chatId,
+            `🎮 بازی شروع شد
+
+👑 حاکم: ${data.hakem.name}
+
+🃏 حکم: ${data.hokm}`,
+        );
+    });
+
+    game.on("playerTurn", (data) => {
+        if (data.player.isBot) return;
+
+        bot.sendMessage(
+            chatId,
+            `🎯 نوبت ${data.player.name}
+
+مثال:
+
+/play A ♠`,
+        );
+    });
+
+    game.on("cardPlayed", (data) => {
+        bot.sendMessage(
+            chatId,
+            `${data.player.name}
+
+${data.card.value}${data.card.suit}`,
+        );
+    });
+
+    game.on("trickFinished", (data) => {
+        bot.sendMessage(
+            chatId,
+            `🏆 برنده دست:
+
+${data.winner.name}`,
+        );
+    });
+
+    game.on("roundFinished", (data) => {
+        bot.sendMessage(
+            chatId,
+            `📊
+
+تیم ۱ : ${data.score.team1}
+
+تیم ۲ : ${data.score.team2}`,
+        );
+    });
+
+    game.on("matchFinished", (data) => {
+        bot.sendMessage(
+            chatId,
+            `🎉 بازی تمام شد
+
+برنده تیم ${data.winner}`,
+        );
+    });
+}
